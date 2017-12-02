@@ -16,6 +16,8 @@ Anyway. You've been warned.
 
 """
 
+import argparse
+import glob
 import os
 import os.path
 import re
@@ -28,6 +30,18 @@ _INPUT_FILENAME = 'input'
 _USAGE = """runner.py [day problem]
     Either run runner.py with no arguments to run the most recent solution, or
     run it with two arguments (day, problem) to run a specific day and problem."""
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('day', type=int, default=None, nargs='?')
+    parser.add_argument('problem', type=int, default=None, nargs='?')
+    parser.add_argument('--test', '-t', action='store_true')
+
+    args = parser.parse_args()
+
+    return args
 
 
 def _get_day_dir(main_dir, problem_day):
@@ -83,10 +97,7 @@ def _get_problem_dir(main_dir, problem_day, problem_number):
     return None
 
 
-
-def get_input_for_problem(main_dir, problem_day, problem_number):
-
-    problem_dir = _get_problem_dir(main_dir, problem_day, problem_number)
+def get_input_for_problem(problem_dir):
 
     input_path = os.path.join(problem_dir, _INPUT_FILENAME)
     if os.path.isfile(input_path):
@@ -94,7 +105,7 @@ def get_input_for_problem(main_dir, problem_day, problem_number):
             return fh.read(input_path)
 
     else:
-        day_dir = _get_day_dir(main_dir, problem_day)
+        day_dir = os.path.dirname(problem_dir)
         input_path = os.path.join(day_dir, _INPUT_FILENAME)
         if os.path.isfile(input_path):
             with open(input_path, 'r') as fh:
@@ -102,89 +113,82 @@ def get_input_for_problem(main_dir, problem_day, problem_number):
     raise EnvironmentError('Could not find input file!')
 
 
-def run_latest_solution(main_dir):
-    """
-    Grab the last/latest (by dir name) directory in main_dir that matches the
-    pattern for problem directories(i.e. day\d{2}_\d{2}) that contains a solution.py
 
-    also, oh god, since when did I even remotely think in regex.
-    """
+def run_solution(main_dir, day=None, problem=None, test=False):
+    if day is not None:
+        day = int(day)
+    if problem is not None:
+        problem = int(problem)
 
-    days = {}
+    solutions_glob = os.path.join(main_dir, '*', '*', _SOLUTION_FILENAME)
+    solution_paths = glob.glob(solutions_glob)
 
-    for day_name in os.listdir(main_dir):
-        day_path = os.path.join(main_dir, day_name)
-        if not os.path.isdir(day_path):
+    solutions = {}
+
+    for path in solution_paths:
+        re_str = '^{0}/day(\d+)/(\d+)/{1}$'.format(main_dir, _SOLUTION_FILENAME)
+
+        match = re.match(re_str, path)
+        if match is None:
             continue
-        match = re.match(_DAY_RE_STR, day_name)
-        if not match:
+
+        glob_day, glob_problem = tuple(int(val) for val in match.groups())
+        if day is not None and day != glob_day:
             continue
-        day = int(match.groups()[0])
 
-        if day in days:
-            raise EnvironmentError("Duplicate day directories found for day {0}".format(day))
+        if problem is not None and problem != glob_problem:
+            continue
 
-        days[day] = set()
-        for problem_name in os.listdir(day_path):
-            problem_path = os.path.join(day_path, problem_name)
-            if not os.path.isdir(problem_path):
-                continue
-            if not problem_name.isdigit():
-                continue
+        solutions_key = (glob_day, glob_problem)
+        if solutions_key in solutions:
+            # TODO better messaging
+            raise EnvironmentError('duplicate day/problem found!')
 
-            solution_path = os.path.join(problem_path, _SOLUTION_FILENAME)
-            if not os.path.isfile(solution_path):
-                continue
-
-            problem = int(problem_name)
-            if problem in days[day]:
-                raise EnvironmentError("Duplicate problem {0} found in day{1}!".format(problem, day))
-            days[day].add(problem)
-    for max_day, problems in sorted(days.items(), reverse=True):
-        if problems:
-            max_problem = max(problems)
-            break
-
-    return run_solution(main_dir, day=max_day, problem=max_problem)
+        solutions[solutions_key] = path
+    solution_path = solutions[max(solutions)]
+    return _run_exact_solution(os.path.dirname(solution_path), test=test)
 
 
-def run_solution(main_dir, day, problem):
-    problem_dir = _get_problem_dir(main_dir, day, problem)
-    if problem_dir is None:
-        day_dir = _get_day_dir(main_dir, day)
-        if day_dir is None:
-            msg = "Could not find a day directory for day {0}!".format(day)
-        else:
-            msg = "Could not find a problem directory for {0} in day {1}!".format(problem, day)
-        sys.exit(msg)
-    solution_filepath = os.path.join(problem_dir, _SOLUTION_FILENAME)
-    if os.path.isfile(solution_filepath):
-        sys.path.append(problem_dir)
-        import solution
+def _run_exact_solution(solution_dir, test=False):
+    """
+    Run the solution in the exact specified directory
+    """
 
-        input_val = get_input_for_problem(main_dir, day, problem)
+    sys.path.append(solution_dir)
+    import solution
+
+    if test:
         try:
             solution.run
         except AttributeError:
-            raise EnvironmentError("The problem solution {0} does not contain a run() function!".format(solution_filepath))
-        return solution.run(input_val)
+            solution_filepath = os.path.join(solution_dir, _SOLUTION_FILENAME)
+            "The problem solution {0} does not contain a run() function!"
+            raise EnvironmentError(msg.format(solution_filepath))
+
+        solution.test()
+
+        # if we hit this, no exceptions, so success
+        return "Success!"
     else:
-        raise EnvironmentError("No solution exists for day {0} problem {1}".format(day, problem))
+        input_val = get_input_for_problem(solution_dir)
+        return solution.run(input_val)
 
 
 
 
-def run(day=None, problem=None):
+
+def run():
+
+    args = _parse_args()
+
+    problem = args.problem
+    day = args.day
+    test = args.test
 
     this_dir = os.path.dirname(__file__)
     try:
-        if problem is None and problem is None:
-            res = run_latest_solution(this_dir)
+        res = run_solution(this_dir, day=day, problem=problem, test=test)
 
-        elif day is not None and problem is not None:
-            res = run_solution(this_dir, day=day, problem=problem)
-        else:
-            raise ValueError('You must provide both day and problem, or neither')
     except EnvironmentError as exc:
         sys.exit(repr(exc))
 
@@ -193,11 +197,4 @@ def run(day=None, problem=None):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        if not len(sys.argv) == 3:
-            sys.exit(_USAGE)
-        day = int(sys.argv[1])
-        problem= int(sys.argv[2])
-        run(day=day, problem=problem)
-    else:
-        run()
+    run()
