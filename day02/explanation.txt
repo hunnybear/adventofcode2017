@@ -1,0 +1,14 @@
+for row in input_val.splitlines():
+  # Sort the rows, so we can save loops.
+  row_vals = sorted([int(v) for v in row.split()], reverse=True)  # sorts each row, high to low
+
+  while row_vals:           # so, we remove each element from the list, first to last, so we don't have to worry about comparing a value against itself
+      a = row_vals.pop(0)   # This is where we remove th element. .pop() means remove an element from the list and return it.
+      for b in row_vals:    # As stated earlier, a is no longer in the list, so we just iterate over what's left
+          if not a % b:     # Here we do the even division check. Python loves its implicit booleans, so this means if a % b == 0
+              break         # break the inner loop
+      else:                 # in Python, for ... else, else is triggered if break is not hit (this makes it so that the checksum += and break is not hit if we didn't find something this loop)
+          continue          # continue means we skip ahead to the next inner loop
+
+      checksum += a / b     # add to the checksum, self explanitory
+      break                 # if we found a good match, break the outer loop (not the full outer loop, but the per-row outer loop)
