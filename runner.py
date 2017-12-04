@@ -192,8 +192,7 @@ def run():
     except EnvironmentError as exc:
         sys.exit(repr(exc))
 
-
-    print res
+    print(res)
 
 
 if __name__ == '__main__':
