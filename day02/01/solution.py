@@ -36,6 +36,7 @@ def run(input_val):
                 continue
 
             checksum += a / b
+            break
 
     return checksum
 
