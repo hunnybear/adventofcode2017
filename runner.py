@@ -162,7 +162,7 @@ def _run_exact_solution(solution_dir, test=False):
             solution.run
         except AttributeError:
             solution_filepath = os.path.join(solution_dir, _SOLUTION_FILENAME)
-            "The problem solution {0} does not contain a run() function!"
+            msg = "The problem solution {0} does not contain a run() function!"
             raise EnvironmentError(msg.format(solution_filepath))
 
         solution.test()
