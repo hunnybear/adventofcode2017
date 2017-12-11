@@ -155,6 +155,8 @@ def _run_exact_solution(solution_dir, test=False):
     """
 
     sys.path.append(solution_dir)
+    # add to allow util.py import from day's directory
+    sys.path.append(os.path.dirname(solution_dir))
     import solution
 
     if test:
