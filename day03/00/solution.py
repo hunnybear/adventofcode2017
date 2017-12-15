@@ -41,8 +41,6 @@ def _get_layer_corners(start, end, layer_len=None):
         yield end - (corner_dist * corner_n)
 
 
-
-
 def _get_dist(n):
 
     layer, layer_start, layer_end, layer_len = _get_layer_info(n)
@@ -72,6 +70,7 @@ def get_plot():
             lists.append(4)
 
     return(lists)
+
 
 def test():
     """
