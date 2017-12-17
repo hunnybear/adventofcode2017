@@ -1,7 +1,6 @@
 
 from __future__ import division
 
-import math
 
 def _get_layer_helper(n):
     pass
