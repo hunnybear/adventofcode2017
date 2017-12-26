@@ -32,6 +32,6 @@ def run(in_val):
         else:
             invalid_counter += 1
 
-    print invalid_counter
+    #print invalid_counter
 
     return valid_counter

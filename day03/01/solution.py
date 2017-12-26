@@ -1,168 +1,70 @@
 import itertools
 
 # For the problem, I could have done this with a dict dict[(x,y)] = val, but I like this better
-class BidirectionalList(list):
-
-    _NOT_SET = object()
-
-    def __init__(self, zero_val=_NOT_SET):
-
-        self._zero = zero_val
-        self._pos_list = []
-        self._neg_list = []
-
-        super(BidirectionalList, self).__init__()
-
-    def __getitem__(self, idx):
-
-        if idx == 0:
-            if self._zero is not self._NOT_SET:
-                return self._zero
-            else:
-                raise IndexError('list index out of range')
-        elif idx > 0:
-            return self._pos_list[idx]
-        elif idx < 0:
-            return self._neg_list[idx * -1]
-        else:
-            # Should never get here
-            assert False
-
-    def __setitem__(self, idx, value):
-
-        if idx == 0:
-            self._zero = value
-        elif self._zero == self._NOT_SET:
-            raise IndexError('list assignment index out of range')
-        elif idx < 0:
-            self._neg_list[idx * -1] = value
-        elif idx > 0:
-            self._pos_list[idx] = value
-        else:
-            # should never get here
-            assert False
-
-    def __delitem__(self, idx):
-
-        if self._pos_list or self._neg_list and idx == 0:
-            msg = 'Cannot delete index 0 if there are other values in a BiDirectional List'
-            raise IndexError(msg)
-        elif idx > 0:
-            del(self._pos_list[idx])
-
-        elif idx < 0:
-            del(self._neg_list[idx * -1])
-        else:
-            # should never get here
-            assert False
-
-    def __contains__(self, item):
-        if self._zero != self._NOT_SET and item == self._zero:
-            return True
-        if item in self._pos_list or item in self._neg_list:
-            return True
-
-        return False
-
-    def __len__(self):
-        if self._zero is self._NOT_SET:
-            return 0
-
-        return 1 + len(self._pos_list) + len(self._neg_list)
-
-    def __max__(self):
-        all_list = self._pos_list + self._neg_list
-        if self._zero is not self._NOT_SET:
-            all_list.append(self._zero)
-        return max(all_list)
-
-    def __min__(self):
-        all_list = self._pos_list + self._neg_list
-        if self._zero is not self._NOT_SET:
-            all_list.append(self._zero)
-        return min(all_list)
-
-    def __reversed__(self):
-        if self._zero is not self._NOT_SET:
-            for item in reversed(self._pos_list):
-                yield item
-
-            yield self._zero
-
-            for item in self._neg_list:
-                yield item
-
-    def __iter__(self):
-        if self._zero is not self._NOT_SET:
-            for item in reversed(self._neg_list):
-                yield item
-            yield self._zero
-            for item in self._pos_list:
-                yield item
-
-    def len_pos(self):
-        if self._zero is self._NOT_SET:
-            return 0
-
-        return len(self._pos_list) + 1
-
-    def len_neg(self):
-        if self._zero is self._NOT_SET:
-            return 0
-
-        return len(self._neg_list) + 1
-
 
 class CoordPlane(object):
 
     def __init__(self):
-        self._list = BidirectionalList(zero_val=BidirectionalList())
+        self._coords = {}
         super(CoordPlane, self).__init__()
 
     def __setitem__(self, idx, value):
         x, y = idx
-        self._list[x][y] = value
+        if x in self._coords:
+            assert y not in self._coords[x]
+        self._coords.setdefault(x, {})[y] = value
 
     def __getitem__(self, idx):
         x, y = idx
-        return self._list[x][y]
+        return self._coords[x][y]
 
     def __delitem__(self, idx):
         x, y = idx
-        del(self._list[x][y])
+        del(self._coords[x][y])
 
-    def __max__(self):
+    def __iter__(self):
 
-        return max(max(self._list))
-
-    def __min__(self):
-
-        return min(min(self._list))
+        for x in self._coords:
+            for y in self._coords[x]:
+                yield self._coords[x][y]
 
     def is_square(self):
         # Doesn't actually check if square, checks if it's square and centered
         # on (0,0), but that works for my purposes.
 
-        y_lens = set(len(col) for col in self._list)
-        if not len(y_lens) == 1:
+        x_range, y_range = self.get_min_max()
+
+        if x_range != y_range:
             return False
 
-        if not len(self._list) == y_lens.pop():
+        if abs(x_range[0]) != x_range[1]:
             return False
+
+        # This is a little brute forcey, but since I'm not using the
+        # bidirectional list idea anymore, just trying to knock it out easily.
+
+        for x in range(x_range[0], x_range[1] + 1):
+            for y in range(y_range[0], y_range[1] + 1):
+                try:
+                    self._coords[x][y]
+                except IndexError:
+                    return False
 
         return True
 
+
+
     def get_min_max(self):
 
-        max_x = self._list.len_pos()
-        min_x = -self._list.len_neg()
+        max_x = max(self._coords)
+        min_x = min(self._coords)
 
         max_y = -float('inf')
         min_y = float('inf')
 
-        for col in self._list:
-            max_y = max(max_y, col.len_pos())
-            min_y = min(min_y, -col.len_neg())
+        for col in self._coords.values():
+            max_y = max(max_y, max(col))
+            min_y = min(min_y, min(col))
 
         return ((min_x, max_x), (min_y, max_y))
 
@@ -177,27 +79,54 @@ class CoordPlane(object):
         )
 
 
-    def print_grid(self):
+    def get_grid_string(self):
         """
         For debugging.
         """
 
+        grid_rows = []
+
+
         val_pad_length = max(len(str(v)) for v in (max(self), min(self)))
 
-        print max(self)
-        print min(self)
-        print val_pad_length
-
         x_range, y_range = self.get_min_max()
-        idx_pad_length = max(len(str(v) for v in x_range + y_range))
+        idx_pad_length = max(len(str(v)) for v in x_range + y_range)
+        pad_length = max([val_pad_length, idx_pad_length])
 
         x_len = x_range[1] - x_range[0]
         y_len = y_range[1] - y_range[0]
 
-        for i in range(y_range[1], y_range[0]-1, -1):
-            pass
+
+        for y in range(y_range[1], y_range[0] - 1, -1):
+            grid_row = "{0:<{pad}}\t".format(y, pad=idx_pad_length)
 
 
+            for x in range(x_range[0], x_range[1] + 1):
+                try:
+                    val = self._coords[x][y]
+                except KeyError:
+                    val = '-'
+                val_line = "{0:>{align}}  ".format(val, align=pad_length)
+
+                grid_row += val_line
+            grid_rows.append(grid_row)
+
+        grid_rows.append("")
+
+        col_key = " " * idx_pad_length + "\t"
+        col_idxs = ["{0:>{pad}}".format(idx, pad=idx_pad_length) for idx in range(x_range[0], x_range[1] + 1)]
+
+        col_key += "  ".join(col_idxs)
+
+        grid_rows.append(col_key)
+
+        return '\n'.join(grid_rows)
+
+
+
+
+    def __str__(self):
+        return self.get_grid_string()
 
 
 def _get_layer_count(spiral):
@@ -218,35 +147,37 @@ def _get_layer_count(spiral):
     return x_range[1]
 
 
-def _generate_spiral(to_layer, start_val=1, spiral=None):
-    x = 0
-    y = 0
-
-    direction = (1, 0)
+def _generate_spiral(to_val, start_val=1, spiral=None):
 
     if spiral is None:
         spiral = CoordPlane()
         spiral[0, 0] = start_val
 
-    while _get_layer_count(spiral) < to_layer:
-        _spiral_helper(spiral)
+    spiral_val_count = 0
+    do_continue = True
+    while do_continue:
+        do_continue = False
+        for val in _spiral_helper(spiral):
+            spiral_val_count += 1
+            if val > to_val:
+                break
+        else:
+            do_continue = True
 
-    return spiral
+    return spiral, spiral_val_count, val
 
 def _get_sum_of_surrounding(spiral, coord):
     total = 0
-    for neighbor in itertools.product((-1, 0, 1), (-1, 0, 1)):
-        print neighbor
-        if neighbor == (0, 0):
+    for neighbor_offset in itertools.product((-1, 0, 1), (-1, 0, 1)):
+        if neighbor_offset == (0, 0):
             continue
+        neighbor = (coord[0] + neighbor_offset[0], coord[1] + neighbor_offset[1])
         try:
             total += spiral[neighbor]
-        except IndexError:
+        except KeyError:
             continue
 
-    return sum
-
-
+    return total
 
 
 def _spiral_helper(spiral):
@@ -255,17 +186,44 @@ def _spiral_helper(spiral):
     pos = (initial_corners[2][0] + 1, initial_corners[2][1])
     directions = ((0, 1), (-1, 0), (0, -1), (1, 0))
 
-    side_len = initial_corners[1][0] - initial_corners[0][0]
+    side_len = initial_corners[1][0] - initial_corners[0][0] + 1
+
+    first_side = True
     for direction in directions:
+        if direction == directions[-1]:
+            side_len += 1
         for _i in range(side_len):
-            spiral[pos] = _get_sum_of_surrounding(spiral, pos)
+            pos_val = _get_sum_of_surrounding(spiral, pos)
+            # holy side effects, batman!
+            spiral[pos] = pos_val
+            yield pos_val
+            pos = (pos[0] + direction[0], pos[1] + direction[1])
+
+        if first_side:
+            first_side = False
+            side_len += 1
+    # handle teh last side
+
+    # TOREMOVE
+    #print("dict:")
+    #print spiral._coords
+    #print("formatted:")
+    #print spiral
+
 
 
 def test():
 
-    spiral = _generate_spiral(10)
+    spiral, steps = _generate_spiral(5)
 
-    spiral.print_grid()
+    print(spiral)
+
+    spiral, steps = _generate_spiral(250)
+
+    print(spiral)
+
 
 def run(in_val):
     in_val = int(in_val)
+    val = _generate_spiral(to_val=in_val)
+    return val
